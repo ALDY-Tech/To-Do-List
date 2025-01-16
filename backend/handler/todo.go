@@ -87,5 +87,7 @@ func DeleteTodo(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusNoContent, nil)
+	c.JSON(http.StatusNoContent, gin.H {
+		"data": "sucessfuly delete data todo",
+	})
 }
