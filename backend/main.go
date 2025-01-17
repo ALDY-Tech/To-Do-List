@@ -37,6 +37,7 @@ func main() {
 		todo.POST("", handlers.CreateTodo)
 		todo.PUT("/:id", handlers.UpdateTodo)
 		todo.DELETE("/:id", handlers.DeleteTodo)
+		todo.PATCH("/:id", handlers.IsCompleted)
 	}
 	
 

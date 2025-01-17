@@ -63,9 +63,8 @@ func UpdateTodo(c *gin.Context) {
 	}
 
 	_, err = config.ConnectDB().Exec(
-		"UPDATE todos SET title=$1, description=$2, completed=$3 WHERE id=$4",
-		todo.Title, todo.Description, todo.Completed, id,
-	)
+		"UPDATE todos SET title=$1, description=$2 WHERE id=$3",
+		todo.Title, todo.Description, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -90,4 +89,29 @@ func DeleteTodo(c *gin.Context) {
 	c.JSON(http.StatusNoContent, gin.H {
 		"data": "sucessfuly delete data todo",
 	})
+}
+
+func IsCompleted(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+
+	var todo model.Todo
+	if err := c.ShouldBindJSON(&todo); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err = config.ConnectDB().Exec(
+		"UPDATE todos SET completed=$1 WHERE id=$2",
+		todo.Completed, id,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Todo update completed successfully"})
 }
