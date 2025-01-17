@@ -3,6 +3,7 @@ const API_BASE_URL = "http://localhost:8080/todos";
 
 // Ambil elemen ul untuk daftar todo
 const todoList = document.getElementById("todoList");
+const completedList = document.getElementById("tes");
 const todoForm = document.getElementById("todoForm");
 const titleInput = document.getElementById("title");
 const descriptionInput = document.getElementById("description");
@@ -15,88 +16,138 @@ async function fetchTodos() {
       const todos = await response.json(); // Parse data JSON dari respons
       renderTodos(todos); // Tampilkan data ke dalam UI
     } else {
-      alert('Gagal mengambil data todo!');
+      alert("Gagal mengambil data todo!");
     }
   } catch (err) {
-    alert('Error saat mengambil data: ' + err.message);
+    alert("Error saat mengambil data: " + err.message);
   }
 }
 
 // Fungsi untuk menampilkan todo di dalam daftar
 function renderTodos(todos) {
-  todoList.innerHTML = ''; // Bersihkan daftar sebelumnya untuk menghindari duplikasi
+  todoList.innerHTML = ""; // Bersihkan daftar aktif
+  completedList.innerHTML = ""; // Bersihkan daftar selesai
 
   todos.forEach((todo) => {
-    const li = document.createElement('li');
-    li.className = 'bg-gray-100 shadow-md rounded-lg p-4 mb-4'; // Tambahkan gaya Tailwind CSS
-    li.dataset.id = todo.id; // Simpan id pada elemen li
+    const li = document.createElement("li");
+    li.className = "bg-gray-100 shadow-md rounded-lg p-4 mb-4";
+    li.dataset.id = todo.id;
     li.innerHTML = `
       <div>
         <h3 class="text-lg font-bold text-gray-700">${todo.title}</h3>
         <p class="text-sm text-gray-500 mb-2">${todo.description}</p>
-        <div class="flex items-center mb-4">
-          <label class="flex items-center space-x-2">
-            <input type="checkbox" class="completedCheckbox" ${
-              todo.completed ? "checked" : ""
-            } />
-            <span class="${todo.completed ? "text-green-500" : "text-red-500"}">
-              ${todo.completed ? "Completed" : "Not Completed"}
-            </span>
-          </label>
-        </div>
         <div class="flex space-x-2">
+          ${
+            !todo.completed
+              ? `<button class="completeBtn bg-green-500 text-white font-bold py-1 px-4 rounded hover:bg-green-700">Complete</button>`
+              : `<button class="uncompleteBtn bg-gray-500 text-white font-bold py-1 px-4 rounded hover:bg-gray-700">Uncompleted</button>`
+          }
           <button class="updateBtn bg-yellow-500 text-white font-bold py-1 px-4 rounded hover:bg-yellow-700">
             Edit
           </button>
-          <button class="deleteBtn bg-red-500 text-white font-bold py-1 px-4 rounded hover:bg-red-700">
-            Delete
-          </button>
+          <button class="deleteBtn bg-red-500 text-white font-bold py-1 px-4 rounded hover:bg-red-700">Delete</button>
         </div>
       </div>
     `;
 
-    // Event listener untuk checkbox completed
-    const completedCheckbox = li.querySelector(".completedCheckbox");
-    completedCheckbox.addEventListener("change", () => {
-      updateCompletedStatus(todo.id, completedCheckbox.checked);
-    });
+    // Event listener untuk tombol Complete
+    if (!todo.completed) {
+      const completeBtn = li.querySelector(".completeBtn");
+      completeBtn.addEventListener("click", () => {
+        markTodoAsComplete(todo.id);
+      });
+    } else {
+      // Event listener untuk tombol Uncomplete
+      const uncompleteBtn = li.querySelector(".uncompleteBtn");
+      uncompleteBtn.addEventListener("click", () => {
+        markTodoAsUncomplete(todo.id);
+      });
+    }
 
-    // Event listener untuk tombol update
-    const updateBtn = li.querySelector('.updateBtn');
-    updateBtn.addEventListener('click', () => {
-      showEditForm(todo, li);
-    });
+     // Event listener untuk tombol update
+     const updateBtn = li.querySelector(".updateBtn");
+     updateBtn.addEventListener("click", () => {
+       showEditForm(todo, li);
+     });
 
-    // Event listener untuk tombol delete
-    const deleteBtn = li.querySelector('.deleteBtn');
-    deleteBtn.addEventListener('click', () => {
+    // Event listener untuk tombol Delete
+    const deleteBtn = li.querySelector(".deleteBtn");
+    deleteBtn.addEventListener("click", () => {
       deleteTodoById(todo.id, li);
     });
 
-    todoList.appendChild(li); // Tambahkan elemen ke dalam ul
+    // Tambahkan elemen ke daftar aktif atau selesai
+    if (todo.completed) {
+      completedList.appendChild(li);
+    } else {
+      todoList.appendChild(li);
+    }
   });
 }
 
-// Fungsi untuk memperbarui status completed
-async function updateCompletedStatus(id, isCompleted) {
+// Fungsi untuk menandai todo sebagai selesai
+async function markTodoAsComplete(id) {
   try {
     const response = await fetch(`${API_BASE_URL}/${id}`, {
-      method: "PATCH", // Gunakan PATCH untuk pembaruan parsial
+      method: "PATCH",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ completed: isCompleted }),
+      body: JSON.stringify({ completed: true }),
     });
 
     if (response.ok) {
-      alert("Status berhasil diperbarui!");
-      await fetchTodos(); // Refresh data
+      // Pindahkan elemen ke daftar selesai
+      const todoItem = document.querySelector(`li[data-id='${id}']`);
+      completedList.appendChild(todoItem);
+      todoItem.querySelector(".completeBtn")?.remove(); // Hapus tombol Complete
+      const uncompleteButton = document.createElement("button");
+      uncompleteButton.className =
+        "uncompleteBtn bg-gray-500 text-white font-bold py-1 px-4 rounded hover:bg-gray-700";
+      uncompleteButton.textContent = "Uncompleted";
+      uncompleteButton.addEventListener("click", () => {
+        markTodoAsUncomplete(id);
+      });
+      todoItem.querySelector(".flex").prepend(uncompleteButton);
+      alert("Todo berhasil ditandai sebagai selesai!");
     } else {
-      const error = await response.json();
-      alert(`Failed to update status: ${error.message}`);
+      alert("Gagal menandai todo sebagai selesai!");
     }
   } catch (err) {
-    alert("Error updating status: " + err.message);
+    alert("Error marking todo as complete: " + err.message);
+  }
+}
+
+// Fungsi untuk menandai todo sebagai belum selesai
+async function markTodoAsUncomplete(id) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ completed: false }),
+    });
+
+    if (response.ok) {
+      // Pindahkan elemen ke daftar aktif
+      const todoItem = document.querySelector(`li[data-id='${id}']`);
+      todoList.appendChild(todoItem);
+      todoItem.querySelector(".uncompleteBtn")?.remove(); // Hapus tombol Uncomplete
+      const completeButton = document.createElement("button");
+      completeButton.className =
+        "completeBtn bg-green-500 text-white font-bold py-1 px-4 rounded hover:bg-green-700";
+      completeButton.textContent = "Complete";
+      completeButton.addEventListener("click", () => {
+        markTodoAsComplete(id);
+      });
+      todoItem.querySelector(".flex").prepend(completeButton);
+      alert("Todo berhasil ditandai sebagai belum selesai!");
+    } else {
+      alert("Gagal menandai todo sebagai belum selesai!");
+    }
+  } catch (err) {
+    alert("Error marking todo as uncomplete: " + err.message);
   }
 }
 
@@ -130,7 +181,9 @@ function showEditForm(todo, li) {
   const saveBtn = li.querySelector(".saveBtn");
   saveBtn.addEventListener("click", async () => {
     const updatedTitle = li.querySelector("#editTitle").value.trim();
-    const updatedDescription = li.querySelector("#editDescription").value.trim();
+    const updatedDescription = li
+      .querySelector("#editDescription")
+      .value.trim();
 
     if (!updatedTitle) {
       alert("Title is required!");
@@ -164,7 +217,7 @@ function showEditForm(todo, li) {
   // Event listener untuk tombol cancel
   const cancelBtn = li.querySelector(".cancelBtn");
   cancelBtn.addEventListener("click", () => {
-    renderTodos([todo]); // Render ulang elemen tanpa perubahan
+    fetchTodos(); // Render ulang elemen tanpa perubahan
   });
 }
 
@@ -172,7 +225,7 @@ function showEditForm(todo, li) {
 async function deleteTodoById(id, li) {
   try {
     const response = await fetch(`${API_BASE_URL}/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
 
     if (response.ok) {
@@ -188,7 +241,7 @@ async function deleteTodoById(id, li) {
 }
 
 // Event listener untuk tambah atau update todo
-todoForm.addEventListener('submit', async (event) => {
+todoForm.addEventListener("submit", async (event) => {
   event.preventDefault(); // Mencegah submit form default
   const title = titleInput.value.trim();
   const description = descriptionInput.value.trim();
@@ -200,23 +253,24 @@ todoForm.addEventListener('submit', async (event) => {
 
   const submitButton = todoForm.querySelector('button[type="submit"]');
 
-  if (submitButton.textContent === 'Update Todo') {
+  if (submitButton.textContent === "Update Todo") {
     const todoId = todoForm.dataset.id;
     try {
       const response = await fetch(`${API_BASE_URL}/${todoId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ title, description }),
       });
 
       if (response.ok) {
-        alert('Todo berhasil diperbarui!');
+        alert("Todo berhasil diperbarui!");
         await fetchTodos(); // Refresh data
         todoForm.reset(); // Reset form
-        submitButton.textContent = 'Add Todo'; // Kembali ke mode tambah
-        submitButton.className = 'bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded';
+        submitButton.textContent = "Add Todo"; // Kembali ke mode tambah
+        submitButton.className =
+          "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded";
         delete todoForm.dataset.id; // Hapus data id untuk menghindari kebingungannya
       } else {
         const error = await response.json();
@@ -228,15 +282,15 @@ todoForm.addEventListener('submit', async (event) => {
   } else {
     try {
       const response = await fetch(API_BASE_URL, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ title, description }),
       });
 
       if (response.ok) {
-        alert('Todo berhasil ditambahkan!');
+        alert("Todo berhasil ditambahkan!");
         await fetchTodos(); // Refresh data
         todoForm.reset(); // Reset form
       } else {
