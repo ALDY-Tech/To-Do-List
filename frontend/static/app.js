@@ -10,16 +10,12 @@ const descriptionInput = document.getElementById("description");
 
 // Fungsi untuk menampilkan semua data todo
 async function fetchTodos() {
-  try {
-    const response = await fetch(API_BASE_URL); // Panggil API GET todos
-    if (response.ok) {
-      const todos = await response.json(); // Parse data JSON dari respons
-      renderTodos(todos); // Tampilkan data ke dalam UI
-    } else {
-      alert("Gagal mengambil data todo!");
-    }
-  } catch (err) {
-    alert("Error saat mengambil data: " + err.message);
+  const response = await fetch(API_BASE_URL); // Panggil API GET todos
+  if (response.ok) {
+    const todos = await response.json(); // Parse data JSON dari respons
+    renderTodos(todos); // Tampilkan data ke dalam UI
+  } else {
+    alert("Gagal mengambil data todo!");
   }
 }
 
@@ -29,6 +25,11 @@ function renderTodos(todos) {
   completedList.innerHTML = ""; // Bersihkan daftar selesai
 
   todos.forEach((todo) => {
+    if (!todo || !todo.id) {
+      alert("Terjadi kesalahan saat menampilkan data todo!");
+      return;
+    }
+
     const li = document.createElement("li");
     li.className = "bg-gray-100 shadow-md rounded-lg p-4 mb-4";
     li.dataset.id = todo.id;
@@ -53,28 +54,36 @@ function renderTodos(todos) {
     // Event listener untuk tombol Complete
     if (!todo.completed) {
       const completeBtn = li.querySelector(".completeBtn");
-      completeBtn.addEventListener("click", () => {
-        markTodoAsComplete(todo.id);
-      });
+      if (completeBtn) {
+        completeBtn.addEventListener("click", () => {
+          markTodoAsComplete(todo.id);
+        });
+      }
     } else {
       // Event listener untuk tombol Uncomplete
       const uncompleteBtn = li.querySelector(".uncompleteBtn");
-      uncompleteBtn.addEventListener("click", () => {
-        markTodoAsUncomplete(todo.id);
+      if (uncompleteBtn) {
+        uncompleteBtn.addEventListener("click", () => {
+          markTodoAsUncomplete(todo.id);
+        });
+      }
+    }
+
+    // Event listener untuk tombol update
+    const updateBtn = li.querySelector(".updateBtn");
+    if (updateBtn) {
+      updateBtn.addEventListener("click", () => {
+        showEditForm(todo, li);
       });
     }
 
-     // Event listener untuk tombol update
-     const updateBtn = li.querySelector(".updateBtn");
-     updateBtn.addEventListener("click", () => {
-       showEditForm(todo, li);
-     });
-
     // Event listener untuk tombol Delete
     const deleteBtn = li.querySelector(".deleteBtn");
-    deleteBtn.addEventListener("click", () => {
-      deleteTodoById(todo.id, li);
-    });
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", () => {
+        deleteTodoById(todo.id, li);
+      });
+    }
 
     // Tambahkan elemen ke daftar aktif atau selesai
     if (todo.completed) {
@@ -109,7 +118,11 @@ async function markTodoAsComplete(id) {
         markTodoAsUncomplete(id);
       });
       todoItem.querySelector(".flex").prepend(uncompleteButton);
-      alert("Todo berhasil ditandai sebagai selesai!");
+      Swal.fire({
+        title: "Completed",
+        text: "Berhasil di tambahkan ke completed",
+        icon: "success",
+      });
     } else {
       alert("Gagal menandai todo sebagai selesai!");
     }
@@ -142,7 +155,11 @@ async function markTodoAsUncomplete(id) {
         markTodoAsComplete(id);
       });
       todoItem.querySelector(".flex").prepend(completeButton);
-      alert("Todo berhasil ditandai sebagai belum selesai!");
+      Swal.fire({
+        title: "Uncompleted",
+        text: "Berhasil di tambahkan ke Todo",
+        icon: "info",
+      });
     } else {
       alert("Gagal menandai todo sebagai belum selesai!");
     }
@@ -201,17 +218,33 @@ function showEditForm(todo, li) {
           description: updatedDescription,
         }),
       });
-
+    
       if (response.ok) {
-        alert("Todo berhasil diperbarui!");
-        await fetchTodos(); // Refresh daftar todo
+        Swal.fire({
+          title: "Are you sure?",
+          text: "You upgrade TodoList!",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#3085d6",
+          cancelButtonColor: "#d33",
+          confirmButtonText: "Yes, upgrade it!"
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            await Swal.fire({
+              title: "Upgraded!",
+              text: "Your todo has been upgraded.",
+              icon: "success"
+            });
+            await fetchTodos(); // Refresh daftar todo
+          }
+        });
       } else {
         const error = await response.json();
         alert(`Failed to update todo: ${error.message}`);
       }
     } catch (err) {
       alert("Error updating todo: " + err.message);
-    }
+    }    
   });
 
   // Event listener untuk tombol cancel
@@ -223,20 +256,49 @@ function showEditForm(todo, li) {
 
 // Fungsi untuk menghapus todo berdasarkan ID
 async function deleteTodoById(id, li) {
+  if (!id || !li) {
+    alert("Invalid todo item or element.");
+    return;
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/${id}`, {
       method: "DELETE",
     });
 
-    if (response.ok) {
-      await fetchTodos(); // Refresh data setelah menghapus
-      li.remove(); // Hapus elemen dari DOM
-    } else {
+    if (!response.ok) {
       const error = await response.json();
-      alert(`Failed to delete: ${error.message}`);
+      alert(`Failed to delete: ${error?.message}`);
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (result?.isConfirmed) {
+      try {
+        await Swal.fire({
+          title: "Deleted!",
+          text: "Your file has been deleted.",
+          icon: "success",
+        });
+        await fetchTodos(); // Memuat ulang data dari server
+        if (li) {
+          li.remove(); // Menghapus elemen dari DOM
+        }
+      } catch (error) {
+        Swal.fire("Error!", "Failed to delete the todo.", "error");
+      }
     }
   } catch (err) {
-    alert("Error deleting todo: " + err.message);
+    alert("Error deleting todo: " + err?.message);
   }
 }
 
@@ -253,53 +315,32 @@ todoForm.addEventListener("submit", async (event) => {
 
   const submitButton = todoForm.querySelector('button[type="submit"]');
 
-  if (submitButton.textContent === "Update Todo") {
-    const todoId = todoForm.dataset.id;
-    try {
-      const response = await fetch(`${API_BASE_URL}/${todoId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ title, description }),
-      });
+  // Menangani jika tombol berada pada mode tambah (selalu mode tambah sekarang)
+  try {
+    const response = await fetch(API_BASE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title, description }),
+    });
 
-      if (response.ok) {
-        alert("Todo berhasil diperbarui!");
-        await fetchTodos(); // Refresh data
-        todoForm.reset(); // Reset form
-        submitButton.textContent = "Add Todo"; // Kembali ke mode tambah
-        submitButton.className =
-          "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded";
-        delete todoForm.dataset.id; // Hapus data id untuk menghindari kebingungannya
-      } else {
-        const error = await response.json();
-        alert(`Failed to update todo: ${error.message}`);
-      }
-    } catch (err) {
-      alert("Error updating todo: " + err.message);
-    }
-  } else {
-    try {
-      const response = await fetch(API_BASE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ title, description }),
+    if (response.ok) {
+      Swal.fire({
+        position: "top-end",
+        icon: "success",
+        title: "Your todo has been added",
+        showConfirmButton: false,
+        timer: 1500
       });
-
-      if (response.ok) {
-        alert("Todo berhasil ditambahkan!");
-        await fetchTodos(); // Refresh data
-        todoForm.reset(); // Reset form
-      } else {
-        const error = await response.json();
-        alert(`Failed to add todo: ${error.message}`);
-      }
-    } catch (err) {
-      alert("Error adding todo: " + err.message);
+      await fetchTodos(); // Refresh data
+      todoForm.reset(); // Reset form
+    } else {
+      const error = await response.json();
+      alert(`Failed to add todo: ${error.message}`);
     }
+  } catch (err) {
+    alert("Error adding todo: " + err.message);
   }
 });
 
